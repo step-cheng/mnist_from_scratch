@@ -17,10 +17,13 @@ def one_hot_encode(labels):
   return one_hot
 
 # Change to preprocessing, make it inside the model
-def normalize(data):
-  """NEEDS TO BE FIXED >>> Data preprocessing: divide by mean, subtract standard deviation"""
-  data = data * (1 / 255)
-  return data
+def normalize(batch):
+  """Data preprocessing to achieve normal distribution: subtract by mean, divide standard deviation"""
+  mean = np.sum(batch) / np.size(batch)
+  std = np.std(batch)
+  proc_batch = (batch - mean) / std
+  # batch = batch * (1 / 255)
+  return proc_batch
 
 def split(img_data, label_data, r):
   """Splits data into two sets, typically one larger set for training, and one smaller for validation"""
@@ -30,11 +33,10 @@ def split(img_data, label_data, r):
   return img_data[:,:div], label_data[:,:div], img_data[:,div:], label_data[:,div:]
 
 def show_image(img, label):
-    """NEEDS TO CHANGE to accept normal label, aka use argmax >>> Show image given a one hot encoded target"""
+    """Plots image with label"""
     img = np.reshape(img.T, (28,28))
-    num = np.where(label == 1)
     plt.figure()
-    plt.title(f'Image number: {num[0]}')
+    plt.title(f'Image number: {label}')
     plt.imshow(img, cmap=plt.cm.gray)
     plt.show()
     
@@ -48,18 +50,22 @@ def initialize(dims):
       # Kaiming he initialization --> sqrt(2/fan_in)
       params['W'+str(i)] = np.random.randn(dims[i], dims[i-1]) * np.sqrt(2/(dims[i-1]))
       params['b'+str(i)] = np.random.randn(dims[i], 1) * np.sqrt(2/dims[i-1])
-      vcs['W'+str(i)] = np.zeros_like(params['W'+str(i)])
+      vcs['dW'+str(i)] = np.zeros_like(params['W'+str(i)])
+      vcs['db'+str(i)] = np.zeros_like(params['b'+str(i)])
   return params, vcs
+
 
 def relu(Z):
   """ReLU activation function"""
   return np.maximum(Z,0)
+
 
 def softmax(Z):
   """Softmax activation function"""
   Z_ = Z - np.max(Z, axis = 0, keepdims = True)
   A = np.exp(Z_) / np.sum(np.exp(Z_), axis = 0, keepdims = True)
   return A
+
 
 def forward_pass(X, params):
   """Does forward pass of the model, matmul is done as f = W*x + b where W is Di+1 x D and x is D x N"""
@@ -77,6 +83,7 @@ def forward_pass(X, params):
 
   return forward
 
+
 def accuracy(A, Y):
   """Calculate accuracy of predictions, arguments A and Y are size 10xN,"""
   assert A.shape == Y.shape
@@ -86,6 +93,7 @@ def accuracy(A, Y):
 
   acc = np.count_nonzero(results) / results.size
   return acc
+
 
 def find_misses(A, Y):
   """Returns a list of the missed image indices and the missed guesses"""
@@ -98,13 +106,16 @@ def find_misses(A, Y):
   miss_guesses = [np.argmax(pred, axis = 0)[m] for m in miss_inds]
   return miss_inds, miss_guesses
 
+
 def relu_deriv(A):
   """ReLU derivative, essentially 1 if x is greater than 0"""
   return A > 0
 
+
 def softmax_crossentropy_deriv(A, Y):
   """Softmax and crossentropy loss derivative. Grouped together for simplified derivative"""
   return A - Y
+
 
 def back_pass(forward, params, Y):
   """back propagation to calculate gradients. Gradients of the weights is just x.
@@ -136,6 +147,7 @@ def back_pass(forward, params, Y):
 
   return grads
 
+
 # Gradient Descent
 def learn(grads, params, rate):
   """Gradient Descent, no momentum"""
@@ -161,13 +173,45 @@ def learnMom(grads, params, rate, vcs, rho):
 
 
 # SEPARATE TRAIN AND TEST, MOVE TRAIN TIME TO OUTSIDE THIS FUNCTION
-def model(img_data, label_data, num_batches, iterations=1, rate=0.01, dims=None, params=None, rho=None, train=True):
+def model_train(img_data, label_data, num_batches, iterations=1, dims=None, rate=0.01, rho=0.9):
   """Train or test the model, plots accuracies and returns the model parameters and missed guesses"""
-  if params is None: 
-    params, vcs = initialize(dims)
+  assert dims != None, "Missing dims"
+  params, vcs = initialize(dims)
 
-  optim = learn
-  # optim = learnMom
+  # optim = learn
+  optim = learnMom
+  assert label_data.shape[1] % num_batches == 0
+  batch_size = int(label_data.shape[1] / num_batches)
+
+  L = len(params)//2
+  accuracies = []
+
+  img_data = normalize(img_data)
+
+  for i in range(1, iterations+1):
+    for j in range(num_batches):
+      forward = forward_pass(img_data[:,j*batch_size:(j+1)*batch_size], params)
+
+      acc = accuracy(forward['A'+str(L)], label_data[:,j*batch_size:(j+1)*batch_size])
+      accuracies.append(acc)
+
+      grads = back_pass(forward, params, label_data[:,j*batch_size:(j+1)*batch_size])
+      # params = optim(grads, params, rate)
+      params, vcs = optim(grads, params, rate, vcs, rho)
+
+    if i % 10 == 0: print(f'Accuracy at iteration {i}: {accuracies[i-1]}')
+
+  plt.figure()
+  plt.title('Training Accuracy')
+  plt.xlabel('Cycles')
+  plt.ylabel('accuracy (%)')
+  plt.plot(range(1,len(accuracies)+1), [100*a for a in accuracies], marker = '.')
+  plt.show()
+
+  return params
+
+def model_test(img_data, label_data, num_batches, params=None, rho=None):
+  assert params != None, "Missing params"
   assert label_data.shape[1] % num_batches == 0
   batch_size = int(label_data.shape[1] / num_batches)
 
@@ -176,41 +220,24 @@ def model(img_data, label_data, num_batches, iterations=1, rate=0.01, dims=None,
   missed_inds = []
   missed_guesses = []
 
-  # training data
-  if train:
-    start = time.time()
-    for i in range(1, iterations+1):
-      for j in range(num_batches):
-        forward = forward_pass(img_data[:,j*batch_size:(j+1)*batch_size], params)
+  # preprocess data
+  img_data = normalize(img_data)
 
-        acc = accuracy(forward['A'+str(L)], label_data[:,j*batch_size:(j+1)*batch_size])
-        accuracies.append(acc)
+  for j in range(num_batches):
+    forward = forward_pass(img_data[:,j*batch_size:(j+1)*batch_size], params)
 
-        grads = back_pass(forward, params, label_data[:,j*batch_size:(j+1)*batch_size])
-        params = optim(grads, params, rate)
-        # params = optim(grads, params, rate, vcs, rho)
+    acc = accuracy(forward['A'+str(L)], label_data[:,j*batch_size:(j+1)*batch_size])
+    accuracies.append(acc)
 
-      if i % 10 == 0: print(f'Accuracy at iteration {i}: {accuracies[i-1]}')
-    end = time.time()
-    print(f'Training Time: {end - start} s')
+    miss_ind, miss_guess = find_misses(forward['A'+str(L)], label_data[:,j*batch_size:(j+1)*batch_size])
+    missed_inds += [j*batch_size + m for m in miss_ind]
+    missed_guesses += [m for m in miss_guess]
+    assert len(missed_inds) == len(missed_guesses)
 
-  # for validating and testing data
-  else:
-      for j in range(num_batches):
-        forward = forward_pass(img_data[:,j*batch_size:(j+1)*batch_size], params)
-
-        acc = accuracy(forward['A'+str(L)], label_data[:,j*batch_size:(j+1)*batch_size])
-        accuracies.append(acc)
-
-        miss_ind, miss_guess = find_misses(forward['A'+str(L)], label_data[:,j*batch_size:(j+1)*batch_size])
-        missed_inds += [j*batch_size + m for m in miss_ind]
-        missed_guesses += [m for m in miss_guess]
-        assert len(missed_inds) == len(missed_guesses)
-
-        print(f'Accuracy at iteration {j+1}: {accuracies[j]}')
+    print(f'Accuracy at iteration {j+1}: {accuracies[j]}')
 
   plt.figure()
-  plt.title('Training Accuracy') if train else plt.title('Test Accuracy')
+  plt.title('Test Accuracy')
   plt.xlabel('Cycles')
   plt.ylabel('accuracy (%)')
   plt.plot(range(1,len(accuracies)+1), [100*a for a in accuracies], marker = '.')
