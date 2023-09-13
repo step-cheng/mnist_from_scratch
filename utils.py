@@ -148,20 +148,8 @@ def back_pass(forward, params, Y):
   return grads
 
 
-# Gradient Descent
-def learn(grads, params, rate):
-  """Gradient Descent, no momentum"""
-  L= len(params)//2
-
-  new_params = {}
-  for i in range(1, L + 1):
-    new_params['b'+str(i)] = params['b'+str(i)] - rate*grads['db'+str(i)]
-    new_params['W'+str(i)] = params['W'+str(i)] - rate*grads['dW'+str(i)]
-
-  return new_params
-
 # Momentum + gradient descent
-def learnMom(grads, params, rate, vcs, rho):
+def learn(grads, params, rate, vcs, rho):
   "Gradient Descent with momentum"
   L = len(params)//2
   for i in range(1,L+1):
@@ -173,13 +161,13 @@ def learnMom(grads, params, rate, vcs, rho):
 
 
 # SEPARATE TRAIN AND TEST, MOVE TRAIN TIME TO OUTSIDE THIS FUNCTION
-def model_train(img_data, label_data, num_batches, iterations=1, dims=None, rate=0.01, rho=0.9):
+def model_train(img_data, label_data, num_batches, iterations=100, dims=None, rate=0.01, rho=0.9):
   """Train or test the model, plots accuracies and returns the model parameters and missed guesses"""
   assert dims != None, "Missing dims"
   params, vcs = initialize(dims)
 
-  # optim = learn
-  optim = learnMom
+  lr_schedule = [0.01 + 1/2*(rate-0.01)*(1+np.cos(i/iterations*np.pi)) for i in range(iterations)]
+
   assert label_data.shape[1] % num_batches == 0
   batch_size = int(label_data.shape[1] / num_batches)
 
@@ -188,7 +176,7 @@ def model_train(img_data, label_data, num_batches, iterations=1, dims=None, rate
 
   img_data = normalize(img_data)
 
-  for i in range(1, iterations+1):
+  for i in range(iterations):
     for j in range(num_batches):
       forward = forward_pass(img_data[:,j*batch_size:(j+1)*batch_size], params)
 
@@ -196,10 +184,10 @@ def model_train(img_data, label_data, num_batches, iterations=1, dims=None, rate
       accuracies.append(acc)
 
       grads = back_pass(forward, params, label_data[:,j*batch_size:(j+1)*batch_size])
-      # params = optim(grads, params, rate)
-      params, vcs = optim(grads, params, rate, vcs, rho)
+      # params = learn(grads, params, rate)
+      params, vcs = learn(grads, params, lr_schedule[i], vcs, rho)
 
-    if i % 10 == 0: print(f'Accuracy at iteration {i}: {accuracies[i-1]}')
+    if (i+1) % 10 == 0: print(f'Accuracy at iteration {i+1}: {accuracies[i]}')
 
   plt.figure()
   plt.title('Training Accuracy')
