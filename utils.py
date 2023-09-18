@@ -11,7 +11,7 @@ def organize(data):
   return x, y
 
 def one_hot_encode(labels):
-  """Returns one hot encoding matrix of size 10xN of N targets"""
+  """Returns one hot encoding matrix of size Nx10 of N targets"""
   one_hot = np.zeros((labels.size, 10))
   one_hot[range(labels.size), labels] = 1
   return one_hot
@@ -48,7 +48,7 @@ def initialize(dims):
       # Kaiming he initialization --> sqrt(2/fan_in)
       params['W'+str(i)] = np.random.randn(dims[i-1], dims[i]) * np.sqrt(2/(dims[i-1]))
       params['b'+str(i)] = np.random.randn(1, dims[i]) * np.sqrt(2/dims[i-1])
-      # can try initializing biases to zero
+      # params['b'+str(i)] = np.zeros((1, dims[i]))
       vcs['dW'+str(i)] = np.zeros_like(params['W'+str(i)])
       vcs['db'+str(i)] = np.zeros_like(params['b'+str(i)])
   return params, vcs
@@ -61,7 +61,6 @@ def relu(Z):
 
 def softmax(Z):
   """Softmax activation function"""
-  # changed axis from 0 to 1
   Z_ = Z - np.max(Z, axis = 1, keepdims = True)
   A = np.exp(Z_) / np.sum(np.exp(Z_), axis = 1, keepdims = True)
   return A
@@ -85,7 +84,7 @@ def forward_pass(X, params):
 
 
 def accuracy(A, Y):
-  """Calculate accuracy of predictions, arguments A and Y are size 10xN,"""
+  """Calculate accuracy of predictions, arguments A and Y are size Nx10,"""
   assert A.shape == Y.shape
   # changed all axis from 0 to 1, check shapes
   pred = np.zeros_like(A)
@@ -142,7 +141,7 @@ def back_pass(forward, params, Y):
     dZ = np.dot(dZ, params['W'+str(i+1)].T) * relu_deriv(forward['Z'+str(i)])
     # grads['dW'+str(i)] = np.dot(dZ, forward['A'+str(i-1)].T)
     grads['dW'+str(i)] = 1/N * np.dot(forward['A'+str(i-1)].T, dZ)
-    assert grads['dW'+str(L)].shape == params['W'+str(L)].shape
+    assert grads['dW'+str(i)].shape == params['W'+str(i)].shape
     grads['db'+str(i)] = 1/N * np.sum(dZ, axis = 0, keepdims=True)
     assert grads['db'+str(i)].shape == params['b'+str(i)].shape
 
