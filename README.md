@@ -10,6 +10,8 @@ The model is a 3 layer neural network, or 2 hidden layers, and achieves around a
 
 In Python, I used the Numpy library for the linear algebra calculations, and used double datatypes. In C++, I used the Eigen library with float datatypes.
 
+I originally developed the neural network in Jupyter Notebook using Python, but since archived the file and moved to Python.
+
 ## What I Learned
 I learned how to implement all the basic algorithms in a fully connected network, including data preprocessing, forward pass, backpropagation, and SGD optimization. It reinforced my mathematical understanding of deep learning with regards to linear algebra and calculus.
 I also familiarized myself with the Eigen library in C++, as well as reinforced my knowledge of numpy in Python.
