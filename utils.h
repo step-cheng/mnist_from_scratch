@@ -91,23 +91,23 @@ void shuffle(MatrixXi &x, MatrixXi &y) {
 	y = temp_y;
 }
 
-void split(MatrixXi x, MatrixXi y, MatrixXd &train_x, 
-			MatrixXi &train_y, MatrixXd &val_x, MatrixXi &val_y, double r) {
+void split(MatrixXi x, MatrixXi y, MatrixXf &train_x, 
+			MatrixXi &train_y, MatrixXf &val_x, MatrixXi &val_y, float r) {
 	int div = r*x.rows();
-	train_x = x.topRows(div).cast<double>();
+	train_x = x.topRows(div).cast<float>();
 	train_y = y.topRows(div);
-	val_x = x.bottomRows(x.rows()-div).cast<double>();
+	val_x = x.bottomRows(x.rows()-div).cast<float>();
 	val_y = y.bottomRows(y.rows()-div);
 }
 
-pair<double, double> normalize(MatrixXd &img_data) {
-	double mean = img_data.mean();
+pair<float, float> normalize(MatrixXf &img_data) {
+	float mean = img_data.mean();
 	int num = img_data.size();
 
 	
-	MatrixXd dummy = img_data;
+	MatrixXf dummy = img_data;
 	dummy = (dummy.array() - mean).square();
-	double std = sqrt(dummy.sum()/num);
+	float std = sqrt(dummy.sum()/num);
 	
 	img_data = (img_data.array() - mean) / std;
 	return make_pair(mean,std);
